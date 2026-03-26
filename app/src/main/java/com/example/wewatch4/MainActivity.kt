@@ -3,45 +3,52 @@ package com.example.wewatch4
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.wewatch4.ui.theme.WeWatch4Theme
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.wewatch4.data.local.MovieDatabase
+import com.example.wewatch4.data.remote.RetrofitClient
+import com.example.wewatch4.data.repository.MovieRepositoryImpl
+import com.example.wewatch4.domain.usecase.*
+import com.example.wewatch4.presentation.ui.MainScreen
+import com.example.wewatch4.presentation.ui.SearchScreen
+import com.example.wewatch4.presentation.viewmodel.MovieViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // 1. Инициализируем зависимости вручную
+        val database = MovieDatabase.getDatabase(this)
+        val repository = MovieRepositoryImpl(database.movieDao(), RetrofitClient.api)
+
+        val factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return MovieViewModel(
+                    GetWatchlistUseCase(repository),
+                    SearchMoviesUseCase(repository),
+                    AddMovieUseCase(repository),
+                    ToggleMovieCheckedUseCase(repository),
+                    DeleteSelectedMoviesUseCase(repository)
+                ) as T
+            }
+        }
+
         setContent {
-            WeWatch4Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+            val navController = rememberNavController()
+            val viewModel: MovieViewModel = viewModel(factory = factory)
+
+            NavHost(navController = navController, startDestination = "main") {
+                composable("main") {
+                    MainScreen(viewModel) { navController.navigate("search") }
+                }
+                composable("search") {
+                    SearchScreen(viewModel) { navController.popBackStack() }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    WeWatch4Theme {
-        Greeting("Android")
     }
 }
